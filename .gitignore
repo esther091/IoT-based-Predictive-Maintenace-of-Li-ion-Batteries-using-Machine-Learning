@@ -1,0 +1,20 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Local runtime data
+backend/battery.db
+
+# Secrets (WiFi name/password, laptop IP) -- copy secrets.example.h to secrets.h
+firmware/**/secrets.h
+firmware/*backup*
+
+# Old, superseded files kept only locally
+archive/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
