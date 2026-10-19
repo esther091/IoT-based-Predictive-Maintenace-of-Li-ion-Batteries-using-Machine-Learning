@@ -23,14 +23,6 @@ def compute_rul(n_eol, n_current, cycle_duration_days=0.5):
     return max(0, (n_eol - n_current) * cycle_duration_days)
 
 
-def clip_normalized(x):
-    """
-    Clips a normalized value to the [0, 1] range
-    Equation 3.11
-    """
-    return max(0.0, min(1.0, x))
-
-
 def mean_absolute_percentage_error(y_true, y_pred):
     """
     MAPE = (100/n) * sum(|y_true - y_pred| / |y_true|)

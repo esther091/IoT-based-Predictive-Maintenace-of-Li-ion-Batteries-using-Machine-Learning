@@ -28,7 +28,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import mean_absolute_error, root_mean_squared_error, r2_score
-from sklearn.model_selection import cross_validate
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 ML_DIR = os.path.join(ROOT, "ml")
@@ -38,9 +37,13 @@ os.chdir(ML_DIR)  # train_models uses paths relative to ml/
 
 from utils import mean_absolute_percentage_error
 from train_models import (
-    BATTERIES, TRAIN_BATTERIES, TEST_BATTERY, FEATURE_COLS,
+    BATTERIES, TRAIN_BATTERIES, TEST_BATTERY, FEATURE_COLS, EVAL_DIR, MODELS_DIR,
     extract_discharge_cycles, compute_targets, remove_outliers, split_data,
 )
+
+# Cycles replayed through the live pipeline (Section 4.2.7)
+REPLAY_CYCLES = [("B0018", 1), ("B0018", 61), ("B0018", 132),
+                 ("B0005", 51), ("B0005", 161), ("B0007", 81)]
 
 COLORS = {"Random Forest": "#2A7BD6", "XGBoost": "#E8683A", "Ensemble": "#1DB07E"}
 FEATURE_LABELS = {"mean_voltage": "Mean voltage", "mean_current": "Mean current",
@@ -68,12 +71,13 @@ def main():
         rows.extend(extract_discharge_cycles(b))
     raw = compute_targets(pd.DataFrame(rows))
     df = remove_outliers(raw.copy())
-    train_df, val_df, test_df = split_data(df)
+    train_df, test_df = split_data(df)
 
-    m = {n: joblib.load(os.path.join("models", f"{n}.pkl"))
-         for n in ("scaler", "rf_soh", "rf_rul", "xgb_soh", "xgb_rul")}
-    X_train = m["scaler"].transform(train_df[FEATURE_COLS])
-    X_test = m["scaler"].transform(test_df[FEATURE_COLS])
+    # Evaluation models (trained without B0018) give every accuracy figure
+    m = {n: joblib.load(os.path.join(EVAL_DIR, f"{n}.pkl"))
+         for n in ("rf_soh", "rf_rul", "xgb_soh", "xgb_rul")}
+    cv = {t: joblib.load(os.path.join(EVAL_DIR, f"cv_{t}.pkl")) for t in ("soh", "rul")}
+    X_test = test_df[FEATURE_COLS].values
 
     # ---------------- Table 4.3 ----------------
     md.append("## Table 4.3: Discharge Cycle Dataset Preparation Summary\n")
@@ -86,32 +90,28 @@ def main():
         md.append(f"| {b} | {len(g)} | {len(kept)} | {g.soh.iloc[0]:.1f} | {g.soh.min():.1f} | {eol_txt} |")
     md.append(f"| Total | {len(raw)} | {len(df)} | | | |\n")
 
-    # ---------------- scaler ranges (Section 3.2.4) ----------------
-    md.append("## Training feature ranges (Min-Max scaler, Section 3.2.4)\n")
+    # ---------------- training feature ranges ----------------
+    md.append("## Training feature ranges (training batteries)\n")
     md.append("| Feature | Min | Max |")
     md.append("|---|---|---|")
-    for f, lo, hi in zip(FEATURE_COLS, m["scaler"].data_min_, m["scaler"].data_max_):
-        md.append(f"| {FEATURE_LABELS[f]} | {lo:.3f} | {hi:.3f} |")
+    for f in FEATURE_COLS:
+        md.append(f"| {FEATURE_LABELS[f]} | {train_df[f].min():.3f} | {train_df[f].max():.3f} |")
     md.append("")
 
     # ---------------- Table 4.4: CV scores of the selected configurations ----------------
-    md.append("## Table 4.4: Selected Hyperparameters and Mean Cross-Validation Scores\n")
+    md.append("## Table 4.4: Selected Hyperparameters and Mean Leave-One-Battery-Out CV Scores\n")
     md.append("| Model | Target | Selected hyperparameters | Mean CV R² | Mean CV MAE |")
     md.append("|---|---|---|---|---|")
-    targets = {"soh": train_df["soh"].values, "rul": train_df["rul"].values}
     for name, key, keys in [
         ("Random Forest", "rf", ["n_estimators", "max_depth", "min_samples_split", "min_samples_leaf", "max_features"]),
         ("XGBoost", "xgb", ["n_estimators", "max_depth", "learning_rate", "subsample", "colsample_bytree", "reg_alpha", "reg_lambda"]),
     ]:
         for tgt in ("soh", "rul"):
-            est = m[f"{key}_{tgt}"]
-            params = est.get_params()
+            params = m[f"{key}_{tgt}"].get_params()
             p_txt = ", ".join(f"{k} = {params[k]}" for k in keys)
-            cv = cross_validate(clone(est), X_train, targets[tgt], cv=5,
-                                scoring=("r2", "neg_mean_absolute_error"))
             unit = "%" if tgt == "soh" else " days"
-            md.append(f"| {name} | {tgt.upper()} | {p_txt} | {cv['test_r2'].mean():.3f} | "
-                      f"{-cv['test_neg_mean_absolute_error'].mean():.2f}{unit} |")
+            md.append(f"| {name} | {tgt.upper()} | {p_txt} | {cv[tgt][key]['r2']:.3f} | "
+                      f"{cv[tgt][key]['mae']:.2f}{unit} |")
     md.append("")
 
     # ---------------- Tables 4.5 / 4.6 ----------------
@@ -137,6 +137,36 @@ def main():
     md.append("|---|---|---|")
     for i, f in enumerate(FEATURE_COLS):
         md.append(f"| {FEATURE_LABELS[f]} | {imp['soh'][i]:.2f} | {imp['rul'][i]:.2f} |")
+    md.append("")
+
+    # ---------------- Robustness: leave-one-battery-out over all four ----------------
+    md.append("## Leave-One-Battery-Out Test (each battery held out in turn, selected hyperparameters)\n")
+    md.append("| Held-out battery | SOH MAE (%) | SOH R² | RUL MAE (days) | RUL R² |")
+    md.append("|---|---|---|---|---|")
+    for held in BATTERIES:
+        tr, te = df[df.battery != held], df[df.battery == held]
+        cells = []
+        for tgt in ("soh", "rul"):
+            rf = clone(m[f"rf_{tgt}"]).fit(tr[FEATURE_COLS].values, tr[tgt].values)
+            xg = clone(m[f"xgb_{tgt}"]).fit(tr[FEATURE_COLS].values, tr[tgt].values)
+            p = (rf.predict(te[FEATURE_COLS].values) + xg.predict(te[FEATURE_COLS].values)) / 2
+            r = metrics(te[tgt].values, p)
+            cells += [f"{r['MAE']:.2f}", f"{r['R2']:.3f}"]
+        md.append(f"| {held} | " + " | ".join(cells) + " |")
+    md.append("\n(Ensemble average. Each row: models trained on the other three batteries.)\n")
+
+    # ---------------- Replay reference: final (deployed) models, offline ----------------
+    final = {n: joblib.load(os.path.join(MODELS_DIR, f"{n}.pkl"))
+             for n in ("rf_soh", "rf_rul", "xgb_soh", "xgb_rul")}
+    md.append("## Replay reference: offline predictions of the final deployed models\n")
+    md.append("| Battery, cycle | True SOH (%) | True RUL (days) | Offline SOH (%) | Offline RUL (days) |")
+    md.append("|---|---|---|---|---|")
+    for b, c in REPLAY_CYCLES:
+        row = raw[(raw.battery == b) & (raw.cycle_number == c)]
+        X = row[FEATURE_COLS].values
+        s = (final["rf_soh"].predict(X)[0] + final["xgb_soh"].predict(X)[0]) / 2
+        u = max(0.0, (final["rf_rul"].predict(X)[0] + final["xgb_rul"].predict(X)[0]) / 2)
+        md.append(f"| {b}, {c} | {row.soh.iloc[0]:.1f} | {row.rul.iloc[0]:.1f} | {s:.1f} | {u:.1f} |")
     md.append("")
 
     with open(os.path.join(OUT_DIR, "results.md"), "w", encoding="utf-8") as fh:

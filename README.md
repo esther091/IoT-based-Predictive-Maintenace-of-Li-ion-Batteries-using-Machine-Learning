@@ -33,10 +33,20 @@ python -m pip install -r requirements.txt
 
 ```powershell
 cd ml
-python train_models.py      # ~5 min; writes ml/models/*.pkl
-python eval_saved_models.py # prints test-set metrics
+python train_models.py      # ~5 min; writes ml/models/eval/*.pkl and ml/models/*.pkl
+python eval_saved_models.py # prints the B0018 test-set metrics
 cd ..
 ```
+
+Training follows the method in Chapter 3 of the report. The four NASA cells
+(B0005, B0006, B0007, B0018) are split by battery. Hyperparameters are tuned by
+leave-one-battery-out cross-validation on B0005, B0006 and B0007, and the
+models trained on those three are tested on B0018, which they never see; these
+evaluation models are saved in `ml/models/eval/` and give the reported
+accuracy. The final models, retrained on all four batteries with the same
+hyperparameters, are saved in `ml/models/` and loaded by the backend. The raw
+features are used directly, without scaling, because tree models are not
+affected by it.
 
 ## Quick start
 

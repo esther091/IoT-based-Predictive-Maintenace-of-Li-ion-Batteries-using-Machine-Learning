@@ -12,11 +12,12 @@ from train_models import (
 )
 
 # Load saved models
-scaler = joblib.load('models/scaler.pkl')
-rf_soh = joblib.load('models/rf_soh.pkl')
-rf_rul = joblib.load('models/rf_rul.pkl')
-xgb_soh = joblib.load('models/xgb_soh.pkl')
-xgb_rul = joblib.load('models/xgb_rul.pkl')
+# Evaluation models (trained without the test battery); models/ holds the
+# final models retrained on every battery, which have seen B0018.
+rf_soh = joblib.load('models/eval/rf_soh.pkl')
+rf_rul = joblib.load('models/eval/rf_rul.pkl')
+xgb_soh = joblib.load('models/eval/xgb_soh.pkl')
+xgb_rul = joblib.load('models/eval/xgb_rul.pkl')
 
 print("Loaded models successfully.")
 
@@ -27,7 +28,7 @@ for battery in BATTERIES:
 df = remove_outliers(compute_targets(pd.DataFrame(all_rows)))
 df = df[df['battery'] == TEST_BATTERY].reset_index(drop=True)
 
-X_scaled = scaler.transform(df[FEATURE_COLS])
+X_scaled = df[FEATURE_COLS].values
 
 y_soh = df['soh']
 y_rul = df['rul']

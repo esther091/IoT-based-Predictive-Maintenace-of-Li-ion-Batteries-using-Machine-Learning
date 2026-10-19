@@ -1,6 +1,6 @@
 """
 ml_inference.py
-Loads the trained scaler and models, and exposes a predict() method
+Loads the trained models, and exposes a predict() method
 used by the backend to turn live cycle features into SOH/RUL predictions.
 """
 
@@ -14,7 +14,6 @@ MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ml"
 class MLInference:
     def __init__(self):
         self.loaded = False
-        self.scaler = None
         self.rf_soh = None
         self.rf_rul = None
         self.xgb_soh = None
@@ -22,7 +21,6 @@ class MLInference:
 
     def load_models(self):
         try:
-            self.scaler = joblib.load(os.path.join(MODELS_DIR, "scaler.pkl"))
             self.rf_soh = joblib.load(os.path.join(MODELS_DIR, "rf_soh.pkl"))
             self.rf_rul = joblib.load(os.path.join(MODELS_DIR, "rf_rul.pkl"))
             self.xgb_soh = joblib.load(os.path.join(MODELS_DIR, "xgb_soh.pkl"))
@@ -42,29 +40,21 @@ class MLInference:
                 "alert_level": "MODELS_NOT_LOADED"
             }
 
-        import pandas as pd
-        mean_voltage = float(mean_voltage)
-        mean_current = abs(float(mean_current))
-        mean_power = abs(float(mean_power))
-        energy_delta = float(energy_delta)
+        # Raw cycle features, in the training column order:
+        # mean_voltage, mean_current, mean_power, energy_wh
+        features = np.array([[float(mean_voltage), abs(float(mean_current)),
+                              abs(float(mean_power)), float(energy_delta)]])
 
-        features = pd.DataFrame(
-            [[mean_voltage, mean_current, mean_power, energy_delta]],
-            columns=["mean_voltage", "mean_current", "mean_power", "energy_wh"]
-        )
-        # Equation (3.10) Min-Max scaling, then Equation (3.11) clipping to [0, 1]
-        features_scaled = np.clip(self.scaler.transform(features), 0.0, 1.0)
-
-        soh_rf = float(self.rf_soh.predict(features_scaled)[0])
-        soh_xgb = float(self.xgb_soh.predict(features_scaled)[0])
+        soh_rf = float(self.rf_soh.predict(features)[0])
+        soh_xgb = float(self.xgb_soh.predict(features)[0])
         soh_final = (soh_rf + soh_xgb) / 2.0
 
         soh_rf = max(0.0, min(100.0, soh_rf))
         soh_xgb = max(0.0, min(100.0, soh_xgb))
         soh_final = max(0.0, min(100.0, soh_final))
 
-        rul_rf = max(0.0, float(self.rf_rul.predict(features_scaled)[0]))
-        rul_xgb = max(0.0, float(self.xgb_rul.predict(features_scaled)[0]))
+        rul_rf = max(0.0, float(self.rf_rul.predict(features)[0]))
+        rul_xgb = max(0.0, float(self.xgb_rul.predict(features)[0]))
         rul_final = (rul_rf + rul_xgb) / 2.0
 
         if rul_final <= 7:

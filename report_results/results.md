@@ -10,45 +10,67 @@
 | B0018 | 132 | 132 | 92.8 | 67.1 | 97 |
 | Total | 636 | 602 | | | |
 
-## Training feature ranges (Min-Max scaler, Section 3.2.4)
+## Training feature ranges (training batteries)
 
 | Feature | Min | Max |
 |---|---|---|
 | Mean voltage | 3.379 | 3.575 |
-| Mean current | 2.010 | 2.013 |
+| Mean current | 1.989 | 2.013 |
 | Mean power | 6.793 | 7.196 |
 | Energy delivered | 4.424 | 7.239 |
 
-## Table 4.4: Selected Hyperparameters and Mean Cross-Validation Scores
+## Table 4.4: Selected Hyperparameters and Mean Leave-One-Battery-Out CV Scores
 
 | Model | Target | Selected hyperparameters | Mean CV R² | Mean CV MAE |
 |---|---|---|---|---|
-| Random Forest | SOH | n_estimators = 300, max_depth = 20, min_samples_split = 5, min_samples_leaf = 1, max_features = sqrt | 0.454 | 2.60% |
-| Random Forest | RUL | n_estimators = 500, max_depth = 10, min_samples_split = 2, min_samples_leaf = 2, max_features = sqrt | 0.114 | 6.63 days |
-| XGBoost | SOH | n_estimators = 500, max_depth = 6, learning_rate = 0.05, subsample = 1.0, colsample_bytree = 1.0, reg_alpha = 0.5, reg_lambda = 0.5 | 0.926 | 1.09% |
-| XGBoost | RUL | n_estimators = 200, max_depth = 3, learning_rate = 0.1, subsample = 0.8, colsample_bytree = 1.0, reg_alpha = 1.0, reg_lambda = 0.5 | 0.136 | 6.09 days |
+| Random Forest | SOH | n_estimators = 200, max_depth = 10, min_samples_split = 2, min_samples_leaf = 1, max_features = sqrt | 0.864 | 3.04% |
+| Random Forest | RUL | n_estimators = 500, max_depth = 10, min_samples_split = 5, min_samples_leaf = 2, max_features = sqrt | 0.601 | 10.67 days |
+| XGBoost | SOH | n_estimators = 100, max_depth = 3, learning_rate = 0.2, subsample = 1.0, colsample_bytree = 1.0, reg_alpha = 0.1, reg_lambda = 2.0 | 0.943 | 1.67% |
+| XGBoost | RUL | n_estimators = 500, max_depth = 3, learning_rate = 0.01, subsample = 0.7, colsample_bytree = 0.6, reg_alpha = 1.0, reg_lambda = 2.0 | 0.538 | 11.39 days |
 
 ## Table 4.5: State of Health Prediction Performance on Test Battery B0018
 
 | Model | MAE (%) | RMSE (%) | MAPE (%) | R² |
 |---|---|---|---|---|
-| Random Forest | 1.762 | 1.831 | 2.28 | 0.9437 |
-| XGBoost | 0.574 | 0.673 | 0.77 | 0.9924 |
-| Ensemble | 1.159 | 1.210 | 1.52 | 0.9754 |
+| Random Forest | 0.996 | 1.091 | 1.32 | 0.9800 |
+| XGBoost | 0.217 | 0.271 | 0.29 | 0.9988 |
+| Ensemble | 0.523 | 0.605 | 0.70 | 0.9938 |
 
 ## Table 4.6: Remaining Useful Life Prediction Performance on Test Battery B0018
 
 | Model | MAE (days) | RMSE (days) | MAPE (%) | R² |
 |---|---|---|---|---|
-| Random Forest | 4.817 | 5.627 | 58.56 | 0.8764 |
-| XGBoost | 4.709 | 5.482 | 49.04 | 0.8827 |
-| Ensemble | 4.729 | 5.376 | 53.67 | 0.8872 |
+| Random Forest | 4.288 | 5.200 | 44.06 | 0.8945 |
+| XGBoost | 5.581 | 6.347 | 61.30 | 0.8428 |
+| Ensemble | 4.875 | 5.719 | 52.00 | 0.8724 |
 
 ## Section 4.2.6: Random Forest Feature Importance
 
 | Feature | RF-SOH | RF-RUL |
 |---|---|---|
-| Mean voltage | 0.34 | 0.35 |
-| Mean current | 0.02 | 0.02 |
-| Mean power | 0.14 | 0.17 |
-| Energy delivered | 0.50 | 0.46 |
+| Mean voltage | 0.35 | 0.34 |
+| Mean current | 0.02 | 0.08 |
+| Mean power | 0.13 | 0.13 |
+| Energy delivered | 0.50 | 0.45 |
+
+## Leave-One-Battery-Out Test (each battery held out in turn, selected hyperparameters)
+
+| Held-out battery | SOH MAE (%) | SOH R² | RUL MAE (days) | RUL R² |
+|---|---|---|---|---|
+| B0005 | 1.65 | 0.967 | 4.58 | 0.925 |
+| B0006 | 2.27 | 0.937 | 5.20 | 0.846 |
+| B0007 | 0.36 | 0.997 | 17.26 | 0.279 |
+| B0018 | 0.52 | 0.994 | 4.87 | 0.872 |
+
+(Ensemble average. Each row: models trained on the other three batteries.)
+
+## Replay reference: offline predictions of the final deployed models
+
+| Battery, cycle | True SOH (%) | True RUL (days) | Offline SOH (%) | Offline RUL (days) |
+|---|---|---|---|---|
+| B0018, 1 | 92.8 | 48.0 | 92.2 | 40.9 |
+| B0018, 61 | 79.0 | 18.0 | 79.0 | 21.5 |
+| B0018, 132 | 67.1 | 0.0 | 67.4 | 0.4 |
+| B0005, 51 | 87.9 | 37.0 | 88.0 | 39.7 |
+| B0005, 161 | 65.2 | 0.0 | 65.2 | 0.2 |
+| B0007, 81 | 80.8 | 43.5 | 80.8 | 42.1 |
