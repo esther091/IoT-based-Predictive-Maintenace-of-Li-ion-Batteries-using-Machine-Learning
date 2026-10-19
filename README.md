@@ -11,10 +11,10 @@ staged 30 / 15 / 7-day alerts.
 
 | Folder | Contents |
 |---|---|
-| `ml/` | `train_models.py` (training), `eval_saved_models.py`, `utils.py`, `data/` (NASA `.mat` files), `models/` (trained `.pkl` files) |
+| `ml/` | `train_models.py` (training), `eval_saved_models.py`, `utils.py`, `data/` (the four NASA `.mat` files, their `README.txt`, and `processed_cycles.csv`: the 602 cycles with features, SOH and RUL), `models/` (trained `.pkl` files) |
 | `backend/` | `main.py` (API + discharge-cycle detection), `ml_inference.py`, `database.py` |
 | `dashboard/` | `dashboard.py` (Streamlit) |
-| `tools/` | `simulate_discharge.py` (replays a NASA cycle in place of the ESP32), `report_results.py` (regenerates Chapter 4 tables and figures) |
+| `tools/` | `simulate_discharge.py` (replays a NASA cycle in place of the ESP32), `report_results.py` (regenerates Chapter 4 tables and figures), `export_dataset.py` (writes `ml/data/processed_cycles.csv`) |
 | `firmware/` | `esp32_firmware_v2/esp32_firmware_v2.ino` (Arduino IDE) |
 | `report_results/` | Chapter 4 tables (`results.md`) and Figures 4.3 to 4.6 |
 | `docs/` | `SETUP_AND_RUN_GUIDE.md` (hardware wiring + running, **start here**), `PROJECT_SPEC.md`, `REPORT_UPDATES.md` |

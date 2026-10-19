@@ -5,9 +5,6 @@ venv/
 __pycache__/
 *.pyc
 
-# Data files - NASA dataset, too large and freely re-downloadable
-data/*.mat
-
 # OS junk files - auto-created by Mac/Windows, irrelevant to the project
 .DS_Store
 Thumbs.db
