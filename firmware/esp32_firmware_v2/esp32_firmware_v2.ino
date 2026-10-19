@@ -63,13 +63,17 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <ModbusMaster.h>
 #include <SPIFFS.h>
 
 // ---------------- configuration ----------------
-// WIFI_SSID, WIFI_PASSWORD and SERVER_URL live in secrets.h (copy secrets.example.h)
+// WIFI_SSID, WIFI_PASSWORD, SERVER_URL and API_KEY live in secrets.h (copy secrets.example.h)
 #include "secrets.h"
+#ifndef API_KEY
+#define API_KEY ""          // older secrets.h without a key: local backend, no key needed
+#endif
 
 #define RS485_EN_PIN     4
 #define RXD2             16
@@ -236,13 +240,29 @@ String buildJSON(const BatteryReading& r) {
 
 int sendToServer(const String& payload) {
   if (WiFi.status() != WL_CONNECTED) return SEND_RETRY;
+  // https:// for the online backend (encrypted; the server certificate is not
+  // pinned), http:// for a backend on the local network
+  bool https = strncmp(SERVER_URL, "https://", 8) == 0;
+  WiFiClientSecure secureClient;
+  WiFiClient plainClient;
   HTTPClient http;
-  http.begin(SERVER_URL);
+  if (https) {
+    secureClient.setInsecure();
+    http.begin(secureClient, SERVER_URL);
+  } else {
+    http.begin(plainClient, SERVER_URL);
+  }
   http.addHeader("Content-Type", "application/json");
-  http.setTimeout(5000);
+  if (strlen(API_KEY) > 0) http.addHeader("X-API-Key", API_KEY);
+  // an online server that was asleep can take a while to answer the first request
+  http.setTimeout(https ? 15000 : 5000);
   int code = http.POST(payload);
   http.end();
   if (code == 200) return SEND_OK;
+  if (code == 401) {
+    Serial.println("[HTTP] backend refused the API key - check API_KEY in secrets.h");
+    return SEND_REJECTED;
+  }
   if (code >= 400 && code < 500) {
     Serial.printf("[HTTP] backend rejected packet (%d) - dropped: %s\n", code, payload.c_str());
     return SEND_REJECTED;

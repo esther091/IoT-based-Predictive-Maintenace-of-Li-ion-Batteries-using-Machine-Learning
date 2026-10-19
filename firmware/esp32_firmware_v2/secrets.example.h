@@ -3,4 +3,12 @@
 #pragma once
 const char* WIFI_SSID     = "YOUR_WIFI_NAME";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
-const char* SERVER_URL    = "http://192.168.1.100:8000/readings";  // laptop IP, port 8000
+
+// Local backend (laptop): its IP on the WiFi network, port 8000, no API key needed
+const char* SERVER_URL    = "http://192.168.1.100:8000/readings";
+#define API_KEY ""
+
+// Online backend (Render): use these two lines instead, with the same key as the
+// API_KEY setting on Render
+// const char* SERVER_URL = "https://YOUR-BACKEND.onrender.com/readings";
+// #define API_KEY "YOUR_SECRET_KEY"

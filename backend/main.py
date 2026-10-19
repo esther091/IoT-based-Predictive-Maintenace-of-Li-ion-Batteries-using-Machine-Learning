@@ -6,15 +6,21 @@ runs ML inference, and serves data to the Streamlit dashboard.
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timezone
 from typing import List, Optional
+import os
 import time
 import uvicorn
+
+# Secret shared with the ESP32. When set (always, when deployed online), a
+# reading is accepted only if it carries this key in its X-API-Key header, so
+# nobody else on the internet can post readings. Left unset for local use.
+API_KEY = os.environ.get("API_KEY", "")
 
 from database import get_db, create_tables, Reading, Cycle, Prediction, SessionLocal
 from ml_inference import inference
@@ -300,9 +306,13 @@ def process_discharge_cycle(db: Session, interrupted: bool = False, start_rest_v
 # ENDPOINTS
 # ============================================================
 @app.post("/readings", status_code=200)
-def receive_reading(data: ReadingInput, db: Session = Depends(get_db)):
+def receive_reading(data: ReadingInput, db: Session = Depends(get_db),
+                    x_api_key: Optional[str] = Header(default=None)):
     global is_discharging, discharge_buffer, cycle_start_time, last_rx_wall, rest_peak_v, discharge_rest_v
     global load_off_since
+
+    if API_KEY and x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Missing or wrong API key")
 
     # A discharge whose readings stopped for too long is closed as INTERRUPTED,
     # so new readings never get glued onto a broken run.
@@ -457,4 +467,4 @@ def health_check():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), reload=False)

@@ -1,19 +1,30 @@
 """
 database.py
-SQLite database setup using SQLAlchemy.
+Database setup using SQLAlchemy.
 Defines the three tables: readings, cycles, predictions.
+
+Locally the data go to a SQLite file (battery.db). When deployed, set the
+DATABASE_URL environment variable to a PostgreSQL address (e.g. Neon) so the
+data survive server restarts.
 """
+
+import os
 
 from sqlalchemy import create_engine, Column, Integer, Float, DateTime, String, inspect, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime, timezone
 
-DATABASE_URL = "sqlite:///./battery.db"
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./battery.db")
+# Hosted PostgreSQL providers give postgres:// or postgresql:// addresses;
+# SQLAlchemy needs the psycopg driver named explicitly.
+for prefix in ("postgres://", "postgresql://"):
+    if DATABASE_URL.startswith(prefix):
+        DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len(prefix):]
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False}
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

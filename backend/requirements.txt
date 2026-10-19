@@ -1,0 +1,13 @@
+# Backend (FastAPI + ML models) -- installed by Render for the online backend.
+# scikit-learn and XGBoost must match the versions the models were trained with.
+fastapi==0.141.1
+uvicorn==0.52.0
+pydantic==2.13.4
+SQLAlchemy==2.0.51
+psycopg[binary]>=3.2
+numpy==2.5.1
+scipy==1.18.0
+scikit-learn==1.9.0
+xgboost==3.3.0
+joblib==1.5.3
+pandas==3.0.5

@@ -1,0 +1,32 @@
+# Render Blueprint: creates the online backend and dashboard from this repository.
+# On Render: New > Blueprint > choose this repository. Render then asks for the
+# values marked sync: false (see docs/DEPLOYMENT_GUIDE.md).
+services:
+  # FastAPI backend: receives the ESP32 readings and runs the models
+  - type: web
+    name: battery-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: DATABASE_URL        # Neon connection string (postgresql://...)
+        sync: false
+      - key: API_KEY             # secret shared with the ESP32 (secrets.h)
+        generateValue: true
+
+  # Streamlit dashboard: the web app viewers open
+  - type: web
+    name: battery-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r dashboard/requirements.txt
+    startCommand: streamlit run dashboard/dashboard.py --server.port $PORT --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.7
+      - key: BACKEND_URL         # https address of battery-api, e.g. https://battery-api.onrender.com
+        sync: false

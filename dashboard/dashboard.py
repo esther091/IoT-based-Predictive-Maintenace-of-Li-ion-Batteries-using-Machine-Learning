@@ -11,11 +11,14 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import os
 import time
 
-# 127.0.0.1, not "localhost": on Windows "localhost" tries IPv6 (::1) first,
-# and since the backend only listens on IPv4 every request stalls ~2 s.
-BACKEND_URL = "http://127.0.0.1:8000"
+# Backend address. Locally: 127.0.0.1, not "localhost" -- on Windows "localhost"
+# tries IPv6 (::1) first, and since the backend only listens on IPv4 every
+# request stalls ~2 s. Online: set BACKEND_URL (a Streamlit Cloud secret) to the
+# deployed backend, e.g. https://<name>.onrender.com
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 REFRESH_INTERVAL = 5
 
 st.set_page_config(
@@ -132,7 +135,7 @@ st.markdown("""
 
 def fetch_latest():
     try:
-        r = requests.get(f"{BACKEND_URL}/latest", timeout=3)
+        r = requests.get(f"{BACKEND_URL}/latest", timeout=10)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -142,7 +145,7 @@ def fetch_latest():
 
 def fetch_history():
     try:
-        r = requests.get(f"{BACKEND_URL}/history?limit=100", timeout=3)
+        r = requests.get(f"{BACKEND_URL}/history?limit=100", timeout=10)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -152,7 +155,7 @@ def fetch_history():
 
 def fetch_health():
     try:
-        r = requests.get(f"{BACKEND_URL}/health", timeout=3)
+        r = requests.get(f"{BACKEND_URL}/health", timeout=10)
         if r.status_code == 200:
             return r.json()
     except Exception:
