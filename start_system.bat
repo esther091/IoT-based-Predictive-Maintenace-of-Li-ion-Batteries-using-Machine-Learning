@@ -28,7 +28,7 @@ REM give the backend time to load the models before the dashboard asks for data
 timeout /t 8 /nobreak >nul
 
 echo Starting the dashboard (Streamlit) ...
-start "Dashboard - Streamlit" /D "%~dp0dashboard" cmd /k ""%PY%" -m streamlit run dashboard.py"
+start "Dashboard - Streamlit" /D "%~dp0dashboard" cmd /k ""%PY%" -m streamlit run dashboard.py --theme.base light"
 
 echo.
 echo  Both are starting. The dashboard opens in your browser.

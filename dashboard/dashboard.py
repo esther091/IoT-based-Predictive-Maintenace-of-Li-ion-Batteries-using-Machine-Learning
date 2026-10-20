@@ -16,7 +16,7 @@ import time
 
 # Backend address. Locally: 127.0.0.1, not "localhost" -- on Windows "localhost"
 # tries IPv6 (::1) first, and since the backend only listens on IPv4 every
-# request stalls ~2 s. Online: set BACKEND_URL (a Streamlit Cloud secret) to the
+# request stalls ~2 s. Online: set BACKEND_URL (a Render environment variable) to the
 # deployed backend, e.g. https://<name>.onrender.com
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 REFRESH_INTERVAL = 5
