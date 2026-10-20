@@ -8,7 +8,7 @@ runs ML inference, and serves data to the Streamlit dashboard.
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timezone
@@ -140,6 +140,16 @@ class ReadingInput(BaseModel):
         # 3 dp: a cycle's energy_delta is only a few Wh, so 0.1 Wh
         # rounding would distort the energy_wh model feature
         return round(v, 3)
+
+    @model_validator(mode="after")
+    def power_matches(self):
+        # the PZEM-017 computes P = V x |I|; allow for its rounding (0.01 V,
+        # 0.01 A, 0.1 W) plus 10%. Rejects impossible packets such as 1 V,
+        # 349 A, 99999 W.
+        expected = self.voltage * abs(self.current)
+        if abs(self.power - expected) > 0.1 * expected + 1.0:
+            raise ValueError(f"Power {self.power} W does not match voltage x current ({expected:.2f} W)")
+        return self
 
 
 class ReadingOut(BaseModel):
